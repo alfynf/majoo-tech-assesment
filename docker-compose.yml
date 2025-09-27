@@ -1,0 +1,56 @@
+version: '3.8'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog_api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: blog_db
+      JWT_SECRET: a-very-secret-key-that-is-long-and-random
+    # The api service will wait for the migrate service to complete successfully
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog_migrate
+    # This command overrides the Dockerfile's CMD and runs our script
+    command: ["./run-migrations.sh"]
+    environment:
+      # Pass the same DB variables to the migration container
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=blog_db
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:13
+    container_name: blog_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blog_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d blog_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
